@@ -2167,4 +2167,38 @@ namespace zed_wrapper {
         }
 
     }
+
+    bool ZEDWrapperNodelet::start_obj_detect() {
+        NODELET_INFO_STREAM("*** Starting Object Detection ***");
+
+        bool imageSync = false;
+        bool detectFast = true;
+        mNhNs.getParam("obj_image_sync", imageSync);
+        NODELET_INFO_STREAM(" * Image Sync: " << imageSync ? "TRUE" : "FALSE");
+        mNhNs.getParam("obj_detect_fast", detectFast);
+        sl::DETECTION_MODE perfMode = detectFast ? sl::DETECTION_MODE_FAST : sl::DETECTION_MODE_ACCURATE;
+        NODELET_INFO_STREAM(" * Performances: " << sl::toString(perfMode));
+
+        sl::ObjectDetectionParameters od_p;
+        od_p.image_sync = imageSync;
+        od_p.performance_mode = perfMode;
+
+        sl::ERROR_CODE objDetError = mZed.enableObjectDetection(od_p);
+
+        if (objDetError != sl::SUCCESS) {
+            NODELET_ERROR_STREAM("Object detection error: " << sl::toString(objDetError));
+
+            mObjDetectionEnabled = false;
+            return false;
+        }
+
+        mObjDetectionEnabled = true;
+        return false;
+    }
+
+    void ZEDWrapperNodelet::stop_obj_detect() {
+        if (mObjDetectionEnabled) {
+            mZed.disableObjectDetection();
+        }
+    }
 } // namespace

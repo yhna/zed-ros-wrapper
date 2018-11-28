@@ -44,6 +44,8 @@ find_package(catkin COMPONENTS
   rosconsole
   sensor_msgs
   stereo_msgs
+  std_msgs
+  geometry_msgs
   dynamic_reconfigure
   tf2_ros
   nodelet
@@ -57,11 +59,18 @@ checkPackage("roscpp" "")
 checkPackage("rosconsole" "")
 checkPackage("sensor_msgs" "")
 checkPackage("stereo_msgs" "")
+checkPackage("std_msgs" "")
+checkPackage("geometry_msgs" "")
 checkPackage("dynamic_reconfigure" "")
 checkPackage("tf2_ros" "")
 checkPackage("nodelet" "")
 checkPackage("tf2_geometry_msgs" "")
 checkPackage("message_generation" "")
+
+add_message_files( FILES
+    object_stamped.msg
+    objects.msg
+  )
 
 add_service_files( FILES
     set_initial_pose.srv
@@ -69,7 +78,10 @@ add_service_files( FILES
     reset_tracking.srv
   )
 
-generate_messages()
+generate_messages( DEPENDENCIES
+    std_msgs
+    geometry_msgs
+)
 
 generate_dynamic_reconfigure_options(
   cfg/Zed.cfg
@@ -81,6 +93,8 @@ catkin_package(
     rosconsole
     sensor_msgs
     stereo_msgs
+    std_msgs
+    geometry_msgs
     image_transport
     dynamic_reconfigure
     tf2_ros
@@ -120,7 +134,7 @@ link_directories(${CUDA_LIBRARY_DIRS})
 
 if(NOT DEFINED CUDA_NPP_LIBRARIES_ZED)
     #To deal with cuda 9 nppi libs and previous versions of ZED SDK
-    set(CUDA_NPP_LIBRARIES_ZED ${CUDA_npp_LIBRARY} ${CUDA_npps_LIBRARY} ${CUDA_nppi_LIBRARY})   
+    set(CUDA_NPP_LIBRARIES_ZED ${CUDA_npp_LIBRARY} ${CUDA_npps_LIBRARY} ${CUDA_nppi_LIBRARY})
 endif()
 
 
@@ -133,11 +147,11 @@ set(LINK_LIBRARIES
 
 add_library(ZEDWrapper ${TOOLS_SRC} ${NODELET_SRC})
 target_link_libraries(ZEDWrapper ${LINK_LIBRARIES})
-add_dependencies(ZEDWrapper ${${PROJECT_NAME}_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
+add_dependencies(ZEDWrapper ${${PROJECT_NAME}_EXPORTED_TARGETS} ${PROJECT_NAME}_genmsg ${PROJECT_NAME}_gencfg)
 
 add_executable(zed_wrapper_node ${NODE_SRC})
 target_link_libraries(zed_wrapper_node ZEDWrapper ${LINK_LIBRARIES})
-add_dependencies(zed_wrapper_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
+add_dependencies(zed_wrapper_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${PROJECT_NAME}_genmsg ${PROJECT_NAME}_gencfg)
 
 ###############################################################################
 

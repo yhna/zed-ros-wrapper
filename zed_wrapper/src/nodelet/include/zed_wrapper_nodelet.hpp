@@ -227,6 +227,14 @@ namespace zed_wrapper {
          */
         void start_tracking();
 
+        /* \bried Start object detection (only since SDK v2.8)
+         */
+        bool start_obj_detect();
+
+        /* \bried Stop object detection (only since SDK v2.8)
+         */
+        void stop_obj_detect();
+
 
 
       private:
@@ -432,6 +440,11 @@ namespace zed_wrapper {
         std::unique_ptr<sl_tools::CSmartMean> mImuPeriodMean_usec;
 
         diagnostic_updater::Updater mDiagUpdater; // Diagnostic Updater
+
+        // Object Detection
+        bool mObjDetectionEnabled = false;
+        float mObjDetConfidence = 20.f;                 // TODO add to dynamic params
+        std::vector<sl::OBJECT_CLASS> mObjDetFilter;    // TODO add to dynamic params
 
     }; // class ZEDROSWrapperNodelet
 } // namespace
