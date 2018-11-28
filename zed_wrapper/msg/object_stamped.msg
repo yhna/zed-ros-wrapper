@@ -9,7 +9,7 @@ int16 label_id
 # Object confidence level (1-99)
 float32 confidence
 
-# Object centroid in world frame
+# Object centroid
 geometry_msgs/Point32 position
 
 # Object velocity
@@ -22,11 +22,11 @@ geometry_msgs/Vector3 linear_vel
 int8 tracking_state 
 
 # 2D Bounding box projected to Camera image
-#    A ------- B
-#    |         |
-#    |         |
-#    |         |
-#    D ------- C
+#      0 ------- 1
+#      |         |
+#      |         |
+#      |         |
+#      3 ------- 2
 geometry_msgs/Point32[4] bbox_2d
 
 # 3D Bounding box in world frame

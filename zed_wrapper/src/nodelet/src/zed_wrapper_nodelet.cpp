@@ -35,6 +35,9 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+#include "zed_wrapper/object_stamped.h"
+#include "zed_wrapper/objects.h"
+
 #include <chrono>
 
 using namespace std;
@@ -267,7 +270,6 @@ namespace zed_wrapper {
         mNhNs.getParam("initial_tracking_pose", mInitialTrackPose);
         set_pose(mInitialTrackPose[0], mInitialTrackPose[1], mInitialTrackPose[2],
                  mInitialTrackPose[3], mInitialTrackPose[4], mInitialTrackPose[5]);
-
 
         // Try to initialize the ZED
         if (!mSvoFilepath.empty()) {
@@ -540,6 +542,19 @@ namespace zed_wrapper {
                 << mImuPubRate << " Hz"
                 << " but ZED camera model does not support IMU data publishing.");
         }
+
+        // Object Detection
+#if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8))
+        mNhNs.getParam("obj_detection", mObjDetEnable);
+        if (mObjDetEnable) {
+            mPubObjDet = mNh.advertise<zed_wrapper::objects>("objects", 1);
+            NODELET_INFO_STREAM("Advertised on topic 'objects'");
+
+        }
+#else
+        mObjDetEnable = false;
+        mObjDetectionActivated = false;
+#endif
 
         // Services
         mSrvSetInitPose = mNh.advertiseService("set_initial_pose", &ZEDWrapperNodelet::on_set_pose, this);
@@ -1597,11 +1612,21 @@ namespace zed_wrapper {
             uint32_t imuSubnumber = mPubImu.getNumSubscribers();
             uint32_t imuRawsubnumber = mPubImuRaw.getNumSubscribers();
             uint32_t pathSubNumber = mPubMapPath.getNumSubscribers() + mPubOdomPath.getNumSubscribers();
-            mGrabActive = ((rgbSubnumber + rgbRawSubnumber + leftSubnumber +
-                            leftRawSubnumber + rightSubnumber + rightRawSubnumber +
-                            depthSubnumber + disparitySubnumber + cloudSubnumber +
-                            poseSubnumber + poseCovSubnumber + odomSubnumber + confImgSubnumber +
-                            confMapSubnumber /*+ imuSubnumber + imuRawsubnumber*/ + pathSubNumber) > 0);
+
+            uint32_t objDetSubnumber = 0;
+            bool objDetActive = false;
+            if (mObjDetEnable) {
+                objDetSubnumber = mPubObjDet.getNumSubscribers();
+                if (objDetSubnumber > 0) {
+                    objDetActive = true;
+                }
+            }
+
+            mGrabActive = (objDetActive || (rgbSubnumber + rgbRawSubnumber + leftSubnumber +
+                                            leftRawSubnumber + rightSubnumber + rightRawSubnumber +
+                                            depthSubnumber + disparitySubnumber + cloudSubnumber +
+                                            poseSubnumber + poseCovSubnumber + odomSubnumber + confImgSubnumber +
+                                            confMapSubnumber /*+ imuSubnumber + imuRawsubnumber*/ + pathSubNumber) > 0);
 
             runParams.enable_point_cloud = false;
 
@@ -1615,9 +1640,10 @@ namespace zed_wrapper {
                                       odomSubnumber > 0 || cloudSubnumber > 0 || depthSubnumber > 0 || pathSubNumber > 0);
 
                 // Detect if one of the subscriber need to have the depth information
-                mComputeDepth = mCamQuality != sl::DEPTH_MODE_NONE && ((depthSubnumber + disparitySubnumber + cloudSubnumber +
-                                poseSubnumber + poseCovSubnumber + odomSubnumber + confImgSubnumber +
-                                confMapSubnumber) > 0);
+                mComputeDepth = mCamQuality != sl::DEPTH_MODE_NONE && (objDetActive ||
+                                (depthSubnumber + disparitySubnumber + cloudSubnumber +
+                                 poseSubnumber + poseCovSubnumber + odomSubnumber + confImgSubnumber +
+                                 confMapSubnumber) > 0);
 
                 if ((startTracking) && !mTrackingActivated && mComputeDepth) { // Start the tracking
                     start_tracking();
@@ -1646,6 +1672,14 @@ namespace zed_wrapper {
                     runParams.enable_depth = false;
                 }
 
+                if (objDetActive && !mObjDetRunning) {
+                    start_obj_detect();
+                } else  {
+                    if (!objDetActive && mObjDetRunning) {
+                        stop_obj_detect();
+                    }
+                }
+
                 mGrabStatus = mZed.grab(runParams); // Ask to not compute the depth
 
                 // cout << toString(grab_status) << endl;
@@ -1666,7 +1700,7 @@ namespace zed_wrapper {
 
                     std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
-                    if ((ros::Time::now() - mPrevFrameTimestamp).toSec() > 5 && !mSvoMode) {
+                    if ((ros::Time::now() - mPrevFrameTimestamp).toSec() > 15 && !mSvoMode) {
                         mCloseZedMutex.lock();
                         mZed.close();
                         mCloseZedMutex.unlock();
@@ -1700,13 +1734,14 @@ namespace zed_wrapper {
                         }
 
                         mTrackingActivated = false;
+                        mObjDetRunning = false;
 
-                        startTracking = mDepthStabilization || poseSubnumber > 0 || poseCovSubnumber > 0 ||
+                        /*startTracking = mDepthStabilization || poseSubnumber > 0 || poseCovSubnumber > 0 ||
                                         odomSubnumber > 0;
 
                         if (startTracking) {  // Start the tracking
                             start_tracking();
-                        }
+                        }*/
                     }
 
                     mDiagUpdater.update();
@@ -1835,7 +1870,7 @@ namespace zed_wrapper {
                 }
 
                 // Publish the point cloud if someone has subscribed to
-                if (cloudSubnumber > 0) {
+                if (cloudSubnumber > 0 || mObjDetRunning) {
                     // Run the point cloud conversion asynchronously to avoid slowing down
                     // all the program
                     // Retrieve raw pointCloud data if latest Pointcloud is ready
@@ -1853,6 +1888,10 @@ namespace zed_wrapper {
                     }
                 } else {
                     mPcPublishing = false;
+                }
+
+                if (mObjDetRunning) {
+                    detectObjects();
                 }
 
                 mCamDataMutex.unlock();
@@ -2179,6 +2218,9 @@ namespace zed_wrapper {
         sl::DETECTION_MODE perfMode = detectFast ? sl::DETECTION_MODE_FAST : sl::DETECTION_MODE_ACCURATE;
         NODELET_INFO_STREAM(" * Performances: " << sl::toString(perfMode));
 
+        mNhNs.getParam("obj_min_confidence", mObjDetConfidence);
+        NODELET_INFO_STREAM(" * Min. Confidence: " << mObjDetConfidence);
+
         sl::ObjectDetectionParameters od_p;
         od_p.image_sync = imageSync;
         od_p.performance_mode = perfMode;
@@ -2188,17 +2230,81 @@ namespace zed_wrapper {
         if (objDetError != sl::SUCCESS) {
             NODELET_ERROR_STREAM("Object detection error: " << sl::toString(objDetError));
 
-            mObjDetectionEnabled = false;
+            mObjDetRunning = false;
             return false;
         }
 
-        mObjDetectionEnabled = true;
+        mObjDetRunning = true;
         return false;
     }
 
     void ZEDWrapperNodelet::stop_obj_detect() {
-        if (mObjDetectionEnabled) {
+        if (mObjDetRunning) {
+            NODELET_INFO_STREAM("*** Stopping Object Detection ***");
             mZed.disableObjectDetection();
+            mObjDetRunning = false;
         }
+    }
+
+    void ZEDWrapperNodelet::detectObjects() {
+        sl::ObjectDetectionRuntimeParameters objectTracker_parameters_rt;
+        objectTracker_parameters_rt.detection_confidence_threshold = mObjDetConfidence;
+        objectTracker_parameters_rt.object_class_filter = mObjDetFilter;
+
+        sl::Objects objects;
+
+        sl::ERROR_CODE objDetRes = mZed.retrieveObjects(objects, objectTracker_parameters_rt);
+
+        if (objDetRes != sl::SUCCESS) {
+            NODELET_WARN_STREAM("Object Detection error: " << sl::toString(objDetRes));
+            return;
+        }
+
+        // NODELET_DEBUG_STREAM("Detected " << objects.object_list.size() << " objects");
+
+        size_t objCount = objects.object_list.size();
+
+        zed_wrapper::objects objMsg;
+
+        objMsg.objects.resize(objCount);
+
+        std_msgs::Header header;
+        header.stamp = mFrameTimestamp;
+        header.frame_id = mBaseFrameId;
+
+        for (size_t i = 0; i < objCount; i++) {
+            objMsg.objects[i].header = header;
+
+            sl::ObjectData data = objects.object_list[i];
+
+            objMsg.objects[i].label = sl::toString(data.label).c_str();
+            objMsg.objects[i].label_id = data.id;
+            objMsg.objects[i].confidence = data.confidence;
+
+            objMsg.objects[i].tracking_state = static_cast<int8_t>(data.tracking_state);
+
+            objMsg.objects[i].position.x = data.position.x;
+            objMsg.objects[i].position.y = data.position.y;
+            objMsg.objects[i].position.z = data.position.z;
+
+            objMsg.objects[i].linear_vel.x = data.velocity.x;
+            objMsg.objects[i].linear_vel.y = data.velocity.y;
+            objMsg.objects[i].linear_vel.z = data.velocity.z;
+
+            for (int c = 0; c < data.bounding_box_image.size(); c++) {
+                objMsg.objects[i].bbox_2d[c].x = data.bounding_box_image[c].x;
+                objMsg.objects[i].bbox_2d[c].y = data.bounding_box_image[c].y;
+                objMsg.objects[i].bbox_2d[c].z = 0.0f;
+            }
+
+            for (int c = 0; c < data.bounding_box.size(); c++) {
+                objMsg.objects[i].bbox_3d[c].x = data.bounding_box[c].x;
+                objMsg.objects[i].bbox_3d[c].y = data.bounding_box[c].y;
+                objMsg.objects[i].bbox_3d[c].z = data.bounding_box[c].z;
+            }
+        }
+
+        mPubObjDet.publish(objMsg);
+
     }
 } // namespace

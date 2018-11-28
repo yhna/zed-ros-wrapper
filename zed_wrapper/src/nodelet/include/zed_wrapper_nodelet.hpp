@@ -170,7 +170,7 @@ namespace zed_wrapper {
                          string leftFrameId, string rightFrameId,
                          bool rawParam = false);
 
-        /* \bried Check if FPS and Resolution chosen by user are correct.
+        /* \brief Check if FPS and Resolution chosen by user are correct.
          *        Modifies FPS to match correct value.
          */
         void checkResolFps();
@@ -223,17 +223,21 @@ namespace zed_wrapper {
          */
         void initTransforms();
 
-        /* \bried Start tracking loading the parameters from param server
+        /* \brief Start tracking loading the parameters from param server
          */
         void start_tracking();
 
-        /* \bried Start object detection (only since SDK v2.8)
+        /* \brief Start object detection (only since SDK v2.8)
          */
         bool start_obj_detect();
 
-        /* \bried Stop object detection (only since SDK v2.8)
+        /* \brief Stop object detection (only since SDK v2.8)
          */
         void stop_obj_detect();
+
+        /* \brief Perform object detection and publish result (only since SDK v2.8)
+         */
+        void detectObjects();
 
 
 
@@ -442,9 +446,12 @@ namespace zed_wrapper {
         diagnostic_updater::Updater mDiagUpdater; // Diagnostic Updater
 
         // Object Detection
-        bool mObjDetectionEnabled = false;
+        bool mObjDetEnable = false;
+        bool mObjDetRunning = false;
         float mObjDetConfidence = 20.f;                 // TODO add to dynamic params
         std::vector<sl::OBJECT_CLASS> mObjDetFilter;    // TODO add to dynamic params
+
+        ros::Publisher mPubObjDet;
 
     }; // class ZEDROSWrapperNodelet
 } // namespace
