@@ -1249,6 +1249,19 @@ namespace zed_wrapper {
             mCamMaxDepth = config.max_depth;
             NODELET_INFO("Reconfigure max depth : %g", mCamMaxDepth);
             break;
+
+        case 6:
+            mCamDataMutex.lock();
+            mObjDetEnable = config.obj_detection;
+            NODELET_INFO("Object Detection : %s", mObjDetEnable ? "ENABLED" : "DISABLED");
+            stop_obj_detect();
+            mCamDataMutex.unlock();
+            break;
+
+        case 7:
+            mObjDetConfidence = config.obj_min_confidence;
+            NODELET_INFO("Object Detection min. confidence: %g", mObjDetConfidence);
+            break;
         }
     }
 
@@ -1561,6 +1574,7 @@ namespace zed_wrapper {
         mElabPeriodMean_sec.reset(new sl_tools::CSmartMean(mCamFrameRate));
         mGrabPeriodMean_usec.reset(new sl_tools::CSmartMean(mCamFrameRate));
         mPcPeriodMean_usec.reset(new sl_tools::CSmartMean(mCamFrameRate));
+        mObjDetPeriodMean_usec.reset(new sl_tools::CSmartMean(mCamFrameRate));
 
         // Timestamp initialization
         if (mSvoMode) {
@@ -1880,7 +1894,13 @@ namespace zed_wrapper {
                 }
 
                 if (mObjDetRunning) {
+                    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+
                     detectObjects(objDetSubnumber > 0, objDetVizSubnumber > 0);
+
+                    double elapsed_usec = std::chrono::duration_cast<std::chrono::microseconds>(now - last_time).count();
+
+                    mObjDetPeriodMean_usec->addValue(elapsed_usec);
                 }
 
                 mCamDataMutex.unlock();
@@ -2171,6 +2191,12 @@ namespace zed_wrapper {
                         } else {
                             stat.add("Tracking status", "INACTIVE");
                         }
+
+                        if (mObjDetRunning) {
+                            stat.addf("Object Detection", "Mean time: %.3f sec", mObjDetPeriodMean_usec->getMean() / 1000000.);
+                        } else {
+                            stat.add("Object Detection", "INACTIVE");
+                        }
                     } else {
                         stat.add("Depth status", "INACTIVE");
                     }
@@ -2264,6 +2290,7 @@ namespace zed_wrapper {
         visualization_msgs::MarkerArray objMarkersMsg;
         objMarkersMsg.markers.resize(objCount * 2);
 
+        #pragma omp parallel for
         for (size_t i = 0; i < objCount; i++) {
             sl::ObjectData data = objects.object_list[i];
 

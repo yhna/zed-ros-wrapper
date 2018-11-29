@@ -243,9 +243,9 @@ namespace zed_wrapper {
          */
         inline sl::float3 generateColorClass(int idx) {
             sl::float3 clr;
-            clr.r = static_cast<uint8_t>(150 + (idx * 456262));
-            clr.g = static_cast<uint8_t>(50  + (idx * 1564684));
-            clr.b = static_cast<uint8_t>(250 + (idx * 76873242));
+            clr.r = static_cast<uint8_t>(233 + (idx * 456262));
+            clr.g = static_cast<uint8_t>(33  + (idx * 1564684));
+            clr.b = static_cast<uint8_t>(133 + (idx * 76873242));
             return clr / 255.f;
         }
 
@@ -449,13 +449,14 @@ namespace zed_wrapper {
         std::unique_ptr<sl_tools::CSmartMean> mGrabPeriodMean_usec;
         std::unique_ptr<sl_tools::CSmartMean> mPcPeriodMean_usec;
         std::unique_ptr<sl_tools::CSmartMean> mImuPeriodMean_usec;
+        std::unique_ptr<sl_tools::CSmartMean> mObjDetPeriodMean_usec;
 
         diagnostic_updater::Updater mDiagUpdater; // Diagnostic Updater
 
         // Object Detection
         bool mObjDetEnable = false;
         bool mObjDetRunning = false;
-        float mObjDetConfidence = 20.f;                 // TODO add to dynamic params
+        float mObjDetConfidence = 50.f;                 // TODO add to dynamic params
         std::vector<sl::OBJECT_CLASS> mObjDetFilter /*= {sl::OBJECT_CLASS_PERSON}*/;    // TODO add to dynamic params
 
         ros::Publisher mPubObjDet;
