@@ -37,6 +37,9 @@
 #include "zed_wrapper/object_stamped.h"
 #include "zed_wrapper/objects.h"
 
+#include "visualization_msgs/Marker.h"
+#include "visualization_msgs/MarkerArray.h"
+
 #include <chrono>
 
 using namespace std;
@@ -546,7 +549,8 @@ namespace zed_wrapper {
         if (mObjDetEnable) {
             mPubObjDet = mNh.advertise<zed_wrapper::objects>("objects", 1);
             NODELET_INFO_STREAM("Advertised on topic 'objects'");
-
+            mPubObjDetViz = mNh.advertise<visualization_msgs::MarkerArray>("object_markers", 1);
+            NODELET_INFO_STREAM("Advertised on topic 'object_markers'");
         }
 #else
         mObjDetEnable = false;
@@ -1611,10 +1615,12 @@ namespace zed_wrapper {
             uint32_t pathSubNumber = mPubMapPath.getNumSubscribers() + mPubOdomPath.getNumSubscribers();
 
             uint32_t objDetSubnumber = 0;
+            uint32_t objDetVizSubnumber = 0;
             bool objDetActive = false;
             if (mObjDetEnable) {
                 objDetSubnumber = mPubObjDet.getNumSubscribers();
-                if (objDetSubnumber > 0) {
+                objDetVizSubnumber = mPubObjDetViz.getNumSubscribers();
+                if (objDetSubnumber > 0 || objDetVizSubnumber > 0) {
                     objDetActive = true;
                 }
             }
@@ -1671,11 +1677,11 @@ namespace zed_wrapper {
 
                 if (objDetActive && !mObjDetRunning) {
                     start_obj_detect();
-                } else  {
+                } /*else  {
                     if (!objDetActive && mObjDetRunning) {
                         stop_obj_detect();
                     }
-                }
+                }*/
 
                 mGrabStatus = mZed.grab(runParams); // Ask to not compute the depth
 
@@ -1725,13 +1731,6 @@ namespace zed_wrapper {
 
                         mTrackingActivated = false;
                         mObjDetRunning = false;
-
-                        /*startTracking = mDepthStabilization || poseSubnumber > 0 || poseCovSubnumber > 0 ||
-                                        odomSubnumber > 0;
-
-                        if (startTracking) {  // Start the tracking
-                            start_tracking();
-                        }*/
                     }
 
                     mDiagUpdater.update();
@@ -1860,7 +1859,7 @@ namespace zed_wrapper {
                 }
 
                 // Publish the point cloud if someone has subscribed to
-                if (cloudSubnumber > 0 || mObjDetRunning) {
+                if (cloudSubnumber > 0) {
                     // Run the point cloud conversion asynchronously to avoid slowing down
                     // all the program
                     // Retrieve raw pointCloud data if latest Pointcloud is ready
@@ -1881,7 +1880,7 @@ namespace zed_wrapper {
                 }
 
                 if (mObjDetRunning) {
-                    detectObjects();
+                    detectObjects(objDetSubnumber > 0, objDetVizSubnumber > 0);
                 }
 
                 mCamDataMutex.unlock();
@@ -2090,7 +2089,7 @@ namespace zed_wrapper {
                             "Working thread is not synchronized with the Camera frame rate");
                         NODELET_DEBUG_STREAM_THROTTLE(
                             1.0, "Expected cycle time: " << loop_rate.expectedCycleTime()
-                            << " - Real cycle time: "
+                            << " - Mean cycle time: "
                             << mean);
                         NODELET_WARN_THROTTLE(10.0, "Elaboration takes longer than requested "
                                               "by the FPS rate. Please consider to "
@@ -2236,7 +2235,7 @@ namespace zed_wrapper {
         }
     }
 
-    void ZEDWrapperNodelet::detectObjects() {
+    void ZEDWrapperNodelet::detectObjects(bool publishObj, bool publishViz) {
         sl::ObjectDetectionRuntimeParameters objectTracker_parameters_rt;
         objectTracker_parameters_rt.detection_confidence_threshold = mObjDetConfidence;
         objectTracker_parameters_rt.object_class_filter = mObjDetFilter;
@@ -2260,41 +2259,164 @@ namespace zed_wrapper {
 
         std_msgs::Header header;
         header.stamp = mFrameTimestamp;
-        header.frame_id = mBaseFrameId;
+        header.frame_id = mCameraFrameId;
+
+        visualization_msgs::MarkerArray objMarkersMsg;
+        objMarkersMsg.markers.resize(objCount * 2);
 
         for (size_t i = 0; i < objCount; i++) {
-            objMsg.objects[i].header = header;
-
             sl::ObjectData data = objects.object_list[i];
 
-            objMsg.objects[i].label = sl::toString(data.label).c_str();
-            objMsg.objects[i].label_id = data.id;
-            objMsg.objects[i].confidence = data.confidence;
+            if (publishObj) {
+                objMsg.objects[i].header = header;
 
-            objMsg.objects[i].tracking_state = static_cast<int8_t>(data.tracking_state);
+                objMsg.objects[i].label = sl::toString(data.label).c_str();
+                objMsg.objects[i].label_id = data.id;
+                objMsg.objects[i].confidence = data.confidence;
 
-            objMsg.objects[i].position.x = data.position.x;
-            objMsg.objects[i].position.y = data.position.y;
-            objMsg.objects[i].position.z = data.position.z;
+                objMsg.objects[i].tracking_state = static_cast<int8_t>(data.tracking_state);
 
-            objMsg.objects[i].linear_vel.x = data.velocity.x;
-            objMsg.objects[i].linear_vel.y = data.velocity.y;
-            objMsg.objects[i].linear_vel.z = data.velocity.z;
+                objMsg.objects[i].position.x = data.position.x;
+                objMsg.objects[i].position.y = data.position.y;
+                objMsg.objects[i].position.z = data.position.z;
 
-            for (int c = 0; c < data.bounding_box_image.size(); c++) {
-                objMsg.objects[i].bbox_2d[c].x = data.bounding_box_image[c].x;
-                objMsg.objects[i].bbox_2d[c].y = data.bounding_box_image[c].y;
-                objMsg.objects[i].bbox_2d[c].z = 0.0f;
+                objMsg.objects[i].linear_vel.x = data.velocity.x;
+                objMsg.objects[i].linear_vel.y = data.velocity.y;
+                objMsg.objects[i].linear_vel.z = data.velocity.z;
+
+                for (int c = 0; c < data.bounding_box_image.size(); c++) {
+                    objMsg.objects[i].bbox_2d[c].x = data.bounding_box_image[c].x;
+                    objMsg.objects[i].bbox_2d[c].y = data.bounding_box_image[c].y;
+                    objMsg.objects[i].bbox_2d[c].z = 0.0f;
+                }
+
+                for (int c = 0; c < data.bounding_box.size(); c++) {
+                    objMsg.objects[i].bbox_3d[c].x = data.bounding_box[c].x;
+                    objMsg.objects[i].bbox_3d[c].y = data.bounding_box[c].y;
+                    objMsg.objects[i].bbox_3d[c].z = data.bounding_box[c].z;
+                }
             }
 
-            for (int c = 0; c < data.bounding_box.size(); c++) {
-                objMsg.objects[i].bbox_3d[c].x = data.bounding_box[c].x;
-                objMsg.objects[i].bbox_3d[c].y = data.bounding_box[c].y;
-                objMsg.objects[i].bbox_3d[c].z = data.bounding_box[c].z;
+            if (publishViz) {
+                visualization_msgs::Marker lines;
+                visualization_msgs::Marker label;
+
+                lines.header = header;
+                lines.lifetime = ros::Duration(0.3);
+                lines.action = visualization_msgs::Marker::ADD;
+                lines.id = data.id * 2;
+                lines.ns = "zed_obj";
+                lines.type = visualization_msgs::Marker::LINE_LIST;
+                lines.scale.x = 0.005;
+
+                label.header = header;
+                label.lifetime = ros::Duration(0.3);
+                label.action = visualization_msgs::Marker::ADD;
+                label.id = data.id * 2 + 1;
+                label.ns = "zed_obj";
+                label.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+                label.scale.x = 0.05;
+                label.scale.y = 0.05;
+                label.scale.z = 0.05;
+
+                sl::float3 color = generateColorClass(data.id);
+
+                lines.color.r = color.r;
+                lines.color.g = color.g;
+                lines.color.b = color.b;
+                lines.color.a = 0.9f;
+
+                label.color.r = color.r;
+                label.color.g = color.g;
+                label.color.b = color.b;
+                label.color.a = 0.9f;
+
+                label.pose.position.x = data.position.x;
+                label.pose.position.y = data.position.y;
+                label.pose.position.z = data.position.z;
+
+                label.text = std::string((data.tracking_state == sl::OBJECT_TRACK_STATE_OK ? "+ " : "- ")) + sl::toString(
+                                 data.label).c_str() + " [" + std::to_string(data.id) + "]";
+
+                geometry_msgs::Point p0;
+                geometry_msgs::Point p1;
+
+                // Top square
+                for (int c = 0; c < 3; c++) {
+                    p0.x = data.bounding_box[c].x;
+                    p0.y = data.bounding_box[c].y;
+                    p0.z = data.bounding_box[c].z;
+
+                    p1.x = data.bounding_box[c + 1].x;
+                    p1.y = data.bounding_box[c + 1].y;
+                    p1.z = data.bounding_box[c + 1].z;
+
+                    lines.points.push_back(p0);
+                    lines.points.push_back(p1);
+                }
+
+                p0.x = data.bounding_box[3].x;
+                p0.y = data.bounding_box[3].y;
+                p0.z = data.bounding_box[3].z;
+
+                p1.x = data.bounding_box[0].x;
+                p1.y = data.bounding_box[0].y;
+                p1.z = data.bounding_box[0].z;
+
+                lines.points.push_back(p0);
+                lines.points.push_back(p1);
+
+                // Bottom square
+                for (int c = 4; c < 7; c++) {
+                    p0.x = data.bounding_box[c].x;
+                    p0.y = data.bounding_box[c].y;
+                    p0.z = data.bounding_box[c].z;
+
+                    p1.x = data.bounding_box[c + 1].x;
+                    p1.y = data.bounding_box[c + 1].y;
+                    p1.z = data.bounding_box[c + 1].z;
+
+                    lines.points.push_back(p0);
+                    lines.points.push_back(p1);
+                }
+
+                p0.x = data.bounding_box[7].x;
+                p0.y = data.bounding_box[7].y;
+                p0.z = data.bounding_box[7].z;
+
+                p1.x = data.bounding_box[4].x;
+                p1.y = data.bounding_box[4].y;
+                p1.z = data.bounding_box[4].z;
+
+                lines.points.push_back(p0);
+                lines.points.push_back(p1);
+
+                // Lateral
+                for (int c = 0; c < 4; c++) {
+                    p0.x = data.bounding_box[c].x;
+                    p0.y = data.bounding_box[c].y;
+                    p0.z = data.bounding_box[c].z;
+
+                    p1.x = data.bounding_box[c + 4].x;
+                    p1.y = data.bounding_box[c + 4].y;
+                    p1.z = data.bounding_box[c + 4].z;
+
+                    lines.points.push_back(p0);
+                    lines.points.push_back(p1);
+                }
+
+                objMarkersMsg.markers[i * 2] = lines;
+                objMarkersMsg.markers[i * 2 + 1] = label;
             }
         }
 
-        mPubObjDet.publish(objMsg);
+        if (publishObj) {
+            mPubObjDet.publish(objMsg);
+        }
+
+        if (mPubObjDetViz) {
+            mPubObjDetViz.publish(objMarkersMsg);
+        }
 
     }
 } // namespace

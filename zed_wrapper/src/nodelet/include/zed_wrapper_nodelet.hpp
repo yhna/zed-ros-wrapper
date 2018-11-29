@@ -237,9 +237,17 @@ namespace zed_wrapper {
 
         /* \brief Perform object detection and publish result (only since SDK v2.8)
          */
-        void detectObjects();
+        void detectObjects(bool publishObj, bool publishViz);
 
-
+        /* \brief Generates an univoque color for each object class ID (only since SDK v2.8)
+         */
+        inline sl::float3 generateColorClass(int idx) {
+            sl::float3 clr;
+            clr.r = static_cast<uint8_t>(150 + (idx * 456262));
+            clr.g = static_cast<uint8_t>(50  + (idx * 1564684));
+            clr.b = static_cast<uint8_t>(250 + (idx * 76873242));
+            return clr / 255.f;
+        }
 
       private:
         // SDK version
@@ -448,9 +456,10 @@ namespace zed_wrapper {
         bool mObjDetEnable = false;
         bool mObjDetRunning = false;
         float mObjDetConfidence = 20.f;                 // TODO add to dynamic params
-        std::vector<sl::OBJECT_CLASS> mObjDetFilter;    // TODO add to dynamic params
+        std::vector<sl::OBJECT_CLASS> mObjDetFilter /*= {sl::OBJECT_CLASS_PERSON}*/;    // TODO add to dynamic params
 
         ros::Publisher mPubObjDet;
+        ros::Publisher mPubObjDetViz;
 
     }; // class ZEDROSWrapperNodelet
 } // namespace

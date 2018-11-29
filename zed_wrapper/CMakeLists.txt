@@ -46,6 +46,7 @@ find_package(catkin COMPONENTS
   stereo_msgs
   std_msgs
   geometry_msgs
+  visualization_msgs
   dynamic_reconfigure
   tf2_ros
   nodelet
@@ -61,6 +62,7 @@ checkPackage("sensor_msgs" "")
 checkPackage("stereo_msgs" "")
 checkPackage("std_msgs" "")
 checkPackage("geometry_msgs" "")
+checkPackage("visualization_msgs" "")
 checkPackage("dynamic_reconfigure" "")
 checkPackage("tf2_ros" "")
 checkPackage("nodelet" "")
@@ -95,6 +97,7 @@ catkin_package(
     stereo_msgs
     std_msgs
     geometry_msgs
+    visualization_msgs
     image_transport
     dynamic_reconfigure
     tf2_ros
