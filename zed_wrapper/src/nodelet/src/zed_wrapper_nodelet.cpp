@@ -2165,7 +2165,9 @@ namespace zed_wrapper {
                     double freq_perc = 100.*freq / mCamFrameRate;
                     stat.addf("Capture FPS", "%.1f Hz (%.1f%%)", freq, freq_perc);
 
-                    stat.addf("Data processing", "%.3f sec (Max. %.3f sec)", mElabPeriodMean_sec->getMean(), 1. / mCamFrameRate);
+                    double proc_perc = 100.*mElabPeriodMean_sec->getMean() * mCamFrameRate;
+                    stat.addf("Data processing", "%.3f sec ( %.1f%% - Max. %.3f sec)", mElabPeriodMean_sec->getMean(), proc_perc,
+                              1. / mCamFrameRate);
 
                     if (mComputeDepth) {
                         stat.add("Depth elaboration", "ACTIVE");
@@ -2212,7 +2214,7 @@ namespace zed_wrapper {
             if (mImuPublishing) {
                 double freq = 1000000. / mImuPeriodMean_usec->getMean();
                 double freq_perc = 100.*freq / mImuPubRate;
-                stat.addf("IMU", "Mean Frequency: %.1f Hz (%.1f%%)", freq, freq_perc);
+                stat.addf("IMU", "%.1f Hz (%.1f%%)", freq, freq_perc);
             } else {
                 stat.add("IMU", "Topics not subscribed");
             }
