@@ -2163,17 +2163,17 @@ namespace zed_wrapper {
 
                     double freq = 1000000. / mGrabPeriodMean_usec->getMean();
                     double freq_perc = 100.*freq / mCamFrameRate;
-                    stat.addf("Capture", "Mean Frequency: %.1f Hz (%.1f%%)", freq, freq_perc);
+                    stat.addf("Capture FPS", "%.1f Hz (%.1f%%)", freq, freq_perc);
 
-                    stat.addf("Processing Time", "Mean time: %.3f sec (Exp. %.3f sec)", mElabPeriodMean_sec->getMean(), 1. / mCamFrameRate);
+                    stat.addf("Data processing", "%.3f sec (Max. %.3f sec)", mElabPeriodMean_sec->getMean(), 1. / mCamFrameRate);
 
                     if (mComputeDepth) {
-                        stat.add("Depth status", "ACTIVE");
+                        stat.add("Depth elaboration", "ACTIVE");
 
                         if (mPcPublishing) {
                             double freq = 1000000. / mPcPeriodMean_usec->getMean();
                             double freq_perc = 100.*freq / mCamFrameRate;
-                            stat.addf("Point Cloud", "Mean Frequency: %.1f Hz (%.1f%%)", freq, freq_perc);
+                            stat.addf("Point Cloud", "%.1f Hz (%.1f%%)", freq, freq_perc);
                         } else {
                             stat.add("Point Cloud", "Topic not subscribed");
                         }
@@ -2193,12 +2193,12 @@ namespace zed_wrapper {
                         }
 
                         if (mObjDetRunning) {
-                            stat.addf("Object Detection", "Mean time: %.3f sec", mObjDetPeriodMean_usec->getMean() / 1000000.);
+                            stat.addf("Object data processing", "%.3f sec", mObjDetPeriodMean_usec->getMean() / 1000000.);
                         } else {
                             stat.add("Object Detection", "INACTIVE");
                         }
                     } else {
-                        stat.add("Depth status", "INACTIVE");
+                        stat.add("Depth elaboration", "INACTIVE");
                     }
                 } else {
                     stat.summaryf(diagnostic_msgs::DiagnosticStatus::ERROR, "Camera error: %s", sl::toString(mGrabStatus).c_str());
