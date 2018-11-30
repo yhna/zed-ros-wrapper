@@ -5,7 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /RobotModel1/Links1
+        - /Camera Model1/Links1
         - /TF1/Frames1
         - /Video1/Camera view1
         - /Video1/Camera view1/Visibility1
@@ -13,7 +13,6 @@ Panels:
         - /Pose1/Odometry1/Covariance1/Position1
         - /Pose1/Odometry1/Covariance1/Orientation1
         - /MarkerArray1
-        - /MarkerArray1/Status1
       Splitter Ratio: 0.5
     Tree Height: 421
   - Class: rviz/Selection
@@ -91,7 +90,7 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-      Name: RobotModel
+      Name: Camera Model
       Robot Description: zed/zed_description
       TF Prefix: ""
       Update Interval: 0
@@ -150,6 +149,7 @@ Visualization Manager:
           Unreliable: true
           Value: true
           Visibility:
+            Camera Model: false
             Depth:
               Confidence image: true
               Confidence map: true
@@ -167,7 +167,6 @@ Visualization Manager:
               Pose Path: true
               PoseWithCovariance: true
               Value: false
-            RobotModel: false
             TF: false
             Value: true
             Video:
@@ -466,7 +465,9 @@ Visualization Manager:
       Marker Topic: /zed/object_markers
       Name: MarkerArray
       Namespaces:
-        "": true
+        bbox: true
+        label: true
+        spheres: true
       Queue Size: 1
       Value: true
   Enabled: true

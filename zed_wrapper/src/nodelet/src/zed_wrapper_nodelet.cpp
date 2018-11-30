@@ -1857,7 +1857,6 @@ namespace zed_wrapper {
                     // Need to flip sign, but cause of this is not sure
                     publishDisparity(disparityZEDMat, mFrameTimestamp);
                 }
-
                 // Publish the confidence image if someone has subscribed to
                 if (confImgSubnumber > 0) {
                     mZed.retrieveImage(confImgZEDMat, sl::VIEW_CONFIDENCE, sl::MEM_CPU, mMatWidth, mMatHeight);
@@ -1900,8 +1899,11 @@ namespace zed_wrapper {
 
                     double elapsed_usec = std::chrono::duration_cast<std::chrono::microseconds>(now - last_time).count();
 
+                    std::cout << elapsed_usec << endl;
+
                     mObjDetPeriodMean_usec->addValue(elapsed_usec);
                 }
+
 
                 mCamDataMutex.unlock();
 
@@ -2290,7 +2292,7 @@ namespace zed_wrapper {
         header.frame_id = mCameraFrameId;
 
         visualization_msgs::MarkerArray objMarkersMsg;
-        objMarkersMsg.markers.resize(objCount * 2);
+        objMarkersMsg.markers.resize(objCount * 3);
 
         #pragma omp parallel for
         for (size_t i = 0; i < objCount; i++) {
@@ -2329,56 +2331,83 @@ namespace zed_wrapper {
             if (publishViz) {
                 visualization_msgs::Marker lines;
                 visualization_msgs::Marker label;
+                visualization_msgs::Marker spheres;
+
+                lines.pose.orientation.w = label.pose.orientation.w = spheres.pose.orientation.w = 1.0;
 
                 lines.header = header;
                 lines.lifetime = ros::Duration(0.3);
                 lines.action = visualization_msgs::Marker::ADD;
-                lines.id = data.id * 2;
-                lines.ns = "zed_obj";
+                lines.id = data.id;
+                lines.ns = "bbox";
                 lines.type = visualization_msgs::Marker::LINE_LIST;
                 lines.scale.x = 0.005;
 
                 label.header = header;
                 label.lifetime = ros::Duration(0.3);
                 label.action = visualization_msgs::Marker::ADD;
-                label.id = data.id * 2 + 1;
-                label.ns = "zed_obj";
+                label.id = data.id;
+                label.ns = "label";
                 label.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
                 label.scale.x = 0.05;
                 label.scale.y = 0.05;
                 label.scale.z = 0.05;
+
+                spheres.header = header;
+                spheres.lifetime = ros::Duration(0.3);
+                spheres.action = visualization_msgs::Marker::ADD;
+                spheres.id = data.id;
+                spheres.ns = "spheres";
+                spheres.type = visualization_msgs::Marker::SPHERE_LIST;
+                spheres.scale.x = 0.02;
+                spheres.scale.y = 0.02;
+                spheres.scale.z = 0.02;
+
+                spheres.color.r = data.tracking_state == sl::OBJECT_TRACK_STATE_OK ? 0.1f : (sl::OBJECT_TRACK_STATE_SEARCHING ? 0.9f :
+                                  0.3f);
+                spheres.color.g = data.tracking_state == sl::OBJECT_TRACK_STATE_OK ? 0.9f : (sl::OBJECT_TRACK_STATE_SEARCHING ? 0.1f :
+                                  0.3f);
+                spheres.color.b = data.tracking_state == sl::OBJECT_TRACK_STATE_OK ? 0.1f : (sl::OBJECT_TRACK_STATE_SEARCHING ? 0.1f :
+                                  0.3f);
+                spheres.color.a = 0.75f;
 
                 sl::float3 color = generateColorClass(data.id);
 
                 lines.color.r = color.r;
                 lines.color.g = color.g;
                 lines.color.b = color.b;
-                lines.color.a = 0.9f;
+                lines.color.a = 0.75f;
 
                 label.color.r = color.r;
                 label.color.g = color.g;
                 label.color.b = color.b;
-                label.color.a = 0.9f;
+                label.color.a = 0.75f;
 
                 label.pose.position.x = data.position.x;
                 label.pose.position.y = data.position.y;
                 label.pose.position.z = data.position.z;
 
-                label.text = std::string((data.tracking_state == sl::OBJECT_TRACK_STATE_OK ? "+ " : "- ")) + sl::toString(
-                                 data.label).c_str() + " [" + std::to_string(data.id) + "]";
+                label.text = std::to_string(data.id) + ". " + std::string(sl::toString(data.label).c_str());
 
                 geometry_msgs::Point p0;
                 geometry_msgs::Point p1;
 
-                // Top square
-                for (int c = 0; c < 3; c++) {
-                    p0.x = data.bounding_box[c].x;
-                    p0.y = data.bounding_box[c].y;
-                    p0.z = data.bounding_box[c].z;
+                // Centroid
+                p0.x = data.position.x;
+                p0.y = data.position.y;
+                p0.z = data.position.z;
 
-                    p1.x = data.bounding_box[c + 1].x;
-                    p1.y = data.bounding_box[c + 1].y;
-                    p1.z = data.bounding_box[c + 1].z;
+                spheres.points.push_back(p0);
+
+                // Top square
+                for (int v = 0; v < 3; v++) {
+                    p0.x = data.bounding_box[v].x;
+                    p0.y = data.bounding_box[v].y;
+                    p0.z = data.bounding_box[v].z;
+
+                    p1.x = data.bounding_box[v + 1].x;
+                    p1.y = data.bounding_box[v + 1].y;
+                    p1.z = data.bounding_box[v + 1].z;
 
                     lines.points.push_back(p0);
                     lines.points.push_back(p1);
@@ -2396,14 +2425,14 @@ namespace zed_wrapper {
                 lines.points.push_back(p1);
 
                 // Bottom square
-                for (int c = 4; c < 7; c++) {
-                    p0.x = data.bounding_box[c].x;
-                    p0.y = data.bounding_box[c].y;
-                    p0.z = data.bounding_box[c].z;
+                for (int v = 4; v < 7; v++) {
+                    p0.x = data.bounding_box[v].x;
+                    p0.y = data.bounding_box[v].y;
+                    p0.z = data.bounding_box[v].z;
 
-                    p1.x = data.bounding_box[c + 1].x;
-                    p1.y = data.bounding_box[c + 1].y;
-                    p1.z = data.bounding_box[c + 1].z;
+                    p1.x = data.bounding_box[v + 1].x;
+                    p1.y = data.bounding_box[v + 1].y;
+                    p1.z = data.bounding_box[v + 1].z;
 
                     lines.points.push_back(p0);
                     lines.points.push_back(p1);
@@ -2420,22 +2449,26 @@ namespace zed_wrapper {
                 lines.points.push_back(p0);
                 lines.points.push_back(p1);
 
-                // Lateral
-                for (int c = 0; c < 4; c++) {
-                    p0.x = data.bounding_box[c].x;
-                    p0.y = data.bounding_box[c].y;
-                    p0.z = data.bounding_box[c].z;
+                // Lateral lines and vertex spheres
+                for (int v = 0; v < 4; v++) {
+                    p0.x = data.bounding_box[v].x;
+                    p0.y = data.bounding_box[v].y;
+                    p0.z = data.bounding_box[v].z;
 
-                    p1.x = data.bounding_box[c + 4].x;
-                    p1.y = data.bounding_box[c + 4].y;
-                    p1.z = data.bounding_box[c + 4].z;
+                    p1.x = data.bounding_box[v + 4].x;
+                    p1.y = data.bounding_box[v + 4].y;
+                    p1.z = data.bounding_box[v + 4].z;
 
                     lines.points.push_back(p0);
                     lines.points.push_back(p1);
+
+                    spheres.points.push_back(p0);
+                    spheres.points.push_back(p1);
                 }
 
-                objMarkersMsg.markers[i * 2] = lines;
-                objMarkersMsg.markers[i * 2 + 1] = label;
+                objMarkersMsg.markers[i * 3] = lines;
+                objMarkersMsg.markers[i * 3 + 1] = label;
+                objMarkersMsg.markers[i * 3 + 2] = spheres;
             }
         }
 
