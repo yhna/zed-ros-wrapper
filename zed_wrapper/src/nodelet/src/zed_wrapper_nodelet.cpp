@@ -1691,11 +1691,7 @@ namespace zed_wrapper {
 
                 if (objDetActive && !mObjDetRunning) {
                     start_obj_detect();
-                } /*else  {
-                    if (!objDetActive && mObjDetRunning) {
-                        stop_obj_detect();
-                    }
-                }*/
+                }
 
                 mGrabStatus = mZed.grab(runParams); // Ask to not compute the depth
 
