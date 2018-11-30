@@ -66,12 +66,13 @@ A brief explanation of each field:
   -  `Component`: name of the diagnostic component
   -  `Message`: summary of the status of the ZED node
   -  `HardwareID`: Model of the ZED camera and its serial number
-  -  `Capture`: grabbing frequency (if video or depth data are subscribed) and the percentage respect to the camera frame rate
-  -  `Processing time`: time in seconds spent to elaborate data and the time limit to achieve max frame rate
-  -  `Depth status`: indicates if the depth processing is performed
+  -  `Capture FPS`: grabbing frequency (if video or depth data are subscribed) and the percentage respect to the camera frame rate
+  -  `Data processing`: time in seconds spent to elaborate data and the perfentage respect to the frame period (T=1/framerate)
+  -  `Depth elaboration`: indicates if the depth processing is performed
   -  `Point Cloud`: point cloud publishing frequency (if there is at least a subscriber) and the percentage respect to the camera frame rate
   -  `Floor Detection`: if the floor detection is enabled, indicates if the floor has been detected and the camera position correctly initialized
-  -  `Tracking status`: indicates the status of the tracking, if enabled
+  -  `Tracking status`: indicates the status of the positional tracking, if enabled
+  -  `Object data processing`: time spent to elaborate Object Detection data
   -  `IMU`: the publishing frequency of the IMU topics, if the camera is the ZED Mini and there is at least a subscriber
 
 
