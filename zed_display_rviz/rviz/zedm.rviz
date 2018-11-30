@@ -12,7 +12,8 @@ Panels:
         - /Pose1/Odometry1/Covariance1
         - /Pose1/Odometry1/Covariance1/Position1
         - /Pose1/Odometry1/Covariance1/Orientation1
-        - /MarkerArray1
+        - /Detected Objects1
+        - /Detected Objects1/Namespaces1
       Splitter Ratio: 0.5
     Tree Height: 421
   - Class: rviz/Selection
@@ -41,7 +42,7 @@ Visualization Manager:
       Cell Size: 1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.0299999993
         Value: Lines
@@ -54,7 +55,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -101,8 +102,6 @@ Visualization Manager:
       Frame Timeout: 5
       Frames:
         All Enabled: false
-        imu_link:
-          Value: true
         map:
           Value: true
         odom:
@@ -126,8 +125,6 @@ Visualization Manager:
         map:
           odom:
             zed_camera_center:
-              imu_link:
-                {}
               zed_left_camera_frame:
                 zed_left_camera_optical_frame:
                   {}
@@ -157,8 +154,8 @@ Visualization Manager:
               DepthCloud: true
               PointCloud2: true
               Value: false
+            Detected Objects: true
             Grid: true
-            MarkerArray: true
             Pose:
               Imu: true
               Odometry: true
@@ -463,7 +460,7 @@ Visualization Manager:
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /zed/object_markers
-      Name: MarkerArray
+      Name: Detected Objects
       Namespaces:
         bbox: true
         label: true
@@ -495,25 +492,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.74973178
+      Distance: 2.03158832
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.404032081
-        Y: -0.240342453
-        Z: -0.078290835
+        X: 0.293856949
+        Y: -0.680820465
+        Z: 0.614030302
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.659796357
+      Pitch: -0.340203434
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.39540672
+      Yaw: 3.31039786
     Saved: ~
 Window Geometry:
   Camera view:
