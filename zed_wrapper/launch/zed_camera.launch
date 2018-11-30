@@ -149,9 +149,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
         <!-- Object Detection -->
         <param name="obj_detection"             value="true" /> <!-- Only since SDK v2.8 - True or False -->
-        <param name="obj_min_confidence"        value="35." />   <!-- Minimum object confidence -->
+        <param name="obj_min_confidence"        value="60." />   <!-- Minimum object confidence -->
         <param name="obj_image_sync"            value="true" /> <!-- True or False -->
-        <param name="obj_detect_fast"           value="false" /> <!-- True or False -->
+        <param name="obj_detect_fast"           value="true" /> <!-- True or False -->
     </node>
 
     <!-- ROS URDF description of the ZED -->

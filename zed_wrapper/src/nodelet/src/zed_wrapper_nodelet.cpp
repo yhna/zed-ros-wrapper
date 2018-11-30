@@ -1574,7 +1574,7 @@ namespace zed_wrapper {
         mElabPeriodMean_sec.reset(new sl_tools::CSmartMean(mCamFrameRate));
         mGrabPeriodMean_usec.reset(new sl_tools::CSmartMean(mCamFrameRate));
         mPcPeriodMean_usec.reset(new sl_tools::CSmartMean(mCamFrameRate));
-        mObjDetPeriodMean_usec.reset(new sl_tools::CSmartMean(mCamFrameRate));
+        mObjDetPeriodMean_msec.reset(new sl_tools::CSmartMean(mCamFrameRate));
 
         // Timestamp initialization
         if (mSvoMode) {
@@ -1893,17 +1893,16 @@ namespace zed_wrapper {
                 }
 
                 if (mObjDetRunning) {
-                    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+                    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
                     detectObjects(objDetSubnumber > 0, objDetVizSubnumber > 0);
 
-                    double elapsed_usec = std::chrono::duration_cast<std::chrono::microseconds>(now - last_time).count();
+                    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
-                    std::cout << elapsed_usec << endl;
+                    double elapsed_msec = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
 
-                    mObjDetPeriodMean_usec->addValue(elapsed_usec);
+                    mObjDetPeriodMean_msec->addValue(elapsed_msec);
                 }
-
 
                 mCamDataMutex.unlock();
 
@@ -2197,7 +2196,7 @@ namespace zed_wrapper {
                         }
 
                         if (mObjDetRunning) {
-                            stat.addf("Object data processing", "%.3f sec", mObjDetPeriodMean_usec->getMean() / 1000000.);
+                            stat.addf("Object data processing", "%.3f sec", mObjDetPeriodMean_msec->getMean() / 1000.);
                         } else {
                             stat.add("Object Detection", "INACTIVE");
                         }
@@ -2229,7 +2228,7 @@ namespace zed_wrapper {
     bool ZEDWrapperNodelet::start_obj_detect() {
         NODELET_INFO_STREAM("*** Starting Object Detection ***");
 
-        bool imageSync = false;
+        bool imageSync = true;
         bool detectFast = true;
         mNhNs.getParam("obj_image_sync", imageSync);
         NODELET_INFO_STREAM(" * Image Sync: " << imageSync ? "TRUE" : "FALSE");
@@ -2266,6 +2265,7 @@ namespace zed_wrapper {
     }
 
     void ZEDWrapperNodelet::detectObjects(bool publishObj, bool publishViz) {
+
         sl::ObjectDetectionRuntimeParameters objectTracker_parameters_rt;
         objectTracker_parameters_rt.detection_confidence_threshold = mObjDetConfidence;
         objectTracker_parameters_rt.object_class_filter = mObjDetFilter;
@@ -2294,7 +2294,6 @@ namespace zed_wrapper {
         visualization_msgs::MarkerArray objMarkersMsg;
         objMarkersMsg.markers.resize(objCount * 3);
 
-        #pragma omp parallel for
         for (size_t i = 0; i < objCount; i++) {
             sl::ObjectData data = objects.object_list[i];
 
@@ -2397,73 +2396,78 @@ namespace zed_wrapper {
                 p0.y = data.position.y;
                 p0.z = data.position.z;
 
-                spheres.points.push_back(p0);
+                spheres.points.resize(9);
+                spheres.points[8] = p0;;
+
+                lines.points.resize(24);
+
+                int linePtIdx = 0;
 
                 // Top square
                 for (int v = 0; v < 3; v++) {
-                    p0.x = data.bounding_box[v].x;
-                    p0.y = data.bounding_box[v].y;
-                    p0.z = data.bounding_box[v].z;
+                    lines.points[linePtIdx].x = data.bounding_box[v].x;
+                    lines.points[linePtIdx].y = data.bounding_box[v].y;
+                    lines.points[linePtIdx].z = data.bounding_box[v].z;
+                    linePtIdx++;
 
-                    p1.x = data.bounding_box[v + 1].x;
-                    p1.y = data.bounding_box[v + 1].y;
-                    p1.z = data.bounding_box[v + 1].z;
-
-                    lines.points.push_back(p0);
-                    lines.points.push_back(p1);
+                    lines.points[linePtIdx].x = data.bounding_box[v + 1].x;
+                    lines.points[linePtIdx].y = data.bounding_box[v + 1].y;
+                    lines.points[linePtIdx].z = data.bounding_box[v + 1].z;
+                    linePtIdx++;
                 }
 
-                p0.x = data.bounding_box[3].x;
-                p0.y = data.bounding_box[3].y;
-                p0.z = data.bounding_box[3].z;
+                lines.points[linePtIdx].x = data.bounding_box[3].x;
+                lines.points[linePtIdx].y = data.bounding_box[3].y;
+                lines.points[linePtIdx].z = data.bounding_box[3].z;
+                linePtIdx++;
 
-                p1.x = data.bounding_box[0].x;
-                p1.y = data.bounding_box[0].y;
-                p1.z = data.bounding_box[0].z;
-
-                lines.points.push_back(p0);
-                lines.points.push_back(p1);
+                lines.points[linePtIdx].x = data.bounding_box[0].x;
+                lines.points[linePtIdx].y = data.bounding_box[0].y;
+                lines.points[linePtIdx].z = data.bounding_box[0].z;
+                linePtIdx++;
 
                 // Bottom square
                 for (int v = 4; v < 7; v++) {
-                    p0.x = data.bounding_box[v].x;
-                    p0.y = data.bounding_box[v].y;
-                    p0.z = data.bounding_box[v].z;
+                    lines.points[linePtIdx].x = data.bounding_box[v].x;
+                    lines.points[linePtIdx].y = data.bounding_box[v].y;
+                    lines.points[linePtIdx].z = data.bounding_box[v].z;
+                    linePtIdx++;
 
-                    p1.x = data.bounding_box[v + 1].x;
-                    p1.y = data.bounding_box[v + 1].y;
-                    p1.z = data.bounding_box[v + 1].z;
-
-                    lines.points.push_back(p0);
-                    lines.points.push_back(p1);
+                    lines.points[linePtIdx].x = data.bounding_box[v + 1].x;
+                    lines.points[linePtIdx].y = data.bounding_box[v + 1].y;
+                    lines.points[linePtIdx].z = data.bounding_box[v + 1].z;
+                    linePtIdx++;
                 }
 
-                p0.x = data.bounding_box[7].x;
-                p0.y = data.bounding_box[7].y;
-                p0.z = data.bounding_box[7].z;
+                lines.points[linePtIdx].x = data.bounding_box[7].x;
+                lines.points[linePtIdx].y = data.bounding_box[7].y;
+                lines.points[linePtIdx].z = data.bounding_box[7].z;
+                linePtIdx++;
 
-                p1.x = data.bounding_box[4].x;
-                p1.y = data.bounding_box[4].y;
-                p1.z = data.bounding_box[4].z;
-
-                lines.points.push_back(p0);
-                lines.points.push_back(p1);
+                lines.points[linePtIdx].x = data.bounding_box[4].x;
+                lines.points[linePtIdx].y = data.bounding_box[4].y;
+                lines.points[linePtIdx].z = data.bounding_box[4].z;
+                linePtIdx++;
 
                 // Lateral lines and vertex spheres
                 for (int v = 0; v < 4; v++) {
-                    p0.x = data.bounding_box[v].x;
-                    p0.y = data.bounding_box[v].y;
-                    p0.z = data.bounding_box[v].z;
+                    lines.points[linePtIdx].x = data.bounding_box[v].x;
+                    lines.points[linePtIdx].y = data.bounding_box[v].y;
+                    lines.points[linePtIdx].z = data.bounding_box[v].z;
+                    linePtIdx++;
 
-                    p1.x = data.bounding_box[v + 4].x;
-                    p1.y = data.bounding_box[v + 4].y;
-                    p1.z = data.bounding_box[v + 4].z;
+                    lines.points[linePtIdx].x = data.bounding_box[v + 4].x;
+                    lines.points[linePtIdx].y = data.bounding_box[v + 4].y;
+                    lines.points[linePtIdx].z = data.bounding_box[v + 4].z;
+                    linePtIdx++;
 
-                    lines.points.push_back(p0);
-                    lines.points.push_back(p1);
+                    spheres.points[v * 2].x = data.bounding_box[v].x;
+                    spheres.points[v * 2].y = data.bounding_box[v].y;
+                    spheres.points[v * 2].z = data.bounding_box[v].z;
 
-                    spheres.points.push_back(p0);
-                    spheres.points.push_back(p1);
+                    spheres.points[v * 2 + 1].x = data.bounding_box[v + 4].x;
+                    spheres.points[v * 2 + 1].y = data.bounding_box[v + 4].y;
+                    spheres.points[v * 2 + 1].z = data.bounding_box[v + 4].z;
                 }
 
                 objMarkersMsg.markers[i * 3] = lines;

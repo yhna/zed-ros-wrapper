@@ -449,7 +449,7 @@ namespace zed_wrapper {
         std::unique_ptr<sl_tools::CSmartMean> mGrabPeriodMean_usec;
         std::unique_ptr<sl_tools::CSmartMean> mPcPeriodMean_usec;
         std::unique_ptr<sl_tools::CSmartMean> mImuPeriodMean_usec;
-        std::unique_ptr<sl_tools::CSmartMean> mObjDetPeriodMean_usec;
+        std::unique_ptr<sl_tools::CSmartMean> mObjDetPeriodMean_msec;
 
         diagnostic_updater::Updater mDiagUpdater; // Diagnostic Updater
 
