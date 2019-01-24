@@ -29,6 +29,7 @@ The zed_ros_wrapper is a catkin package. It depends on the following ROS package
    - dynamic_reconfigure
    - urdf
    - diagnostic_updater
+   - Sophus
 
 Open a terminal and build the package:
 
