@@ -740,7 +740,7 @@ namespace zed_wrapper {
     }
 
     bool ZEDWrapperNodelet::getCamera2BaseTransform() {
-        NODELET_INFO("Getting static TF from '%s' to '%s'" , mCameraFrameId.c_str(), mBaseFrameId.c_str());
+        NODELET_INFO("Getting static TF from '%s' to '%s'", mCameraFrameId.c_str(), mBaseFrameId.c_str());
 
         mCamera2BaseTransfValid = false;
 
@@ -775,7 +775,7 @@ namespace zed_wrapper {
 
         // <<<<< Static transforms
 
-        NODELET_INFO("Static TF from '%s' to '%s' is valid" , mCameraFrameId.c_str(), mBaseFrameId.c_str());
+        NODELET_INFO("Static TF from '%s' to '%s' is valid", mCameraFrameId.c_str(), mBaseFrameId.c_str());
         NODELET_INFO(" * T: [%g,%g,%g]",
                      mCamera2BaseTransf.getOrigin()[0], mCamera2BaseTransf.getOrigin()[1], mCamera2BaseTransf.getOrigin()[2]);
         NODELET_INFO(" * Q: [%g,%g,%g,%g]",
@@ -788,7 +788,7 @@ namespace zed_wrapper {
     }
 
     bool ZEDWrapperNodelet::getSens2CameraTransform() {
-        NODELET_INFO("Getting static TF from '%s' to '%s'" , mDepthFrameId.c_str(), mCameraFrameId.c_str());
+        NODELET_INFO("Getting static TF from '%s' to '%s'", mDepthFrameId.c_str(), mCameraFrameId.c_str());
 
         mSensor2CameraTransfValid = false;
 
@@ -823,7 +823,7 @@ namespace zed_wrapper {
 
         // <<<<< Static transforms
 
-        NODELET_INFO("Static TF from '%s' to '%s' is valid" , mDepthFrameId.c_str(), mCameraFrameId.c_str());
+        NODELET_INFO("Static TF from '%s' to '%s' is valid", mDepthFrameId.c_str(), mCameraFrameId.c_str());
         NODELET_INFO(" * T: [%g,%g,%g]",
                      mSensor2CameraTransf.getOrigin()[0], mSensor2CameraTransf.getOrigin()[1], mSensor2CameraTransf.getOrigin()[2]);
         NODELET_INFO(" * Q: [%g,%g,%g,%g]",
@@ -836,7 +836,7 @@ namespace zed_wrapper {
     }
 
     bool ZEDWrapperNodelet::getSens2BaseTransform() {
-        NODELET_INFO("Getting static TF from '%s' to '%s'" , mDepthFrameId.c_str(), mBaseFrameId.c_str());
+        NODELET_INFO("Getting static TF from '%s' to '%s'", mDepthFrameId.c_str(), mBaseFrameId.c_str());
 
         mSensor2BaseTransfValid = false;
 
@@ -871,7 +871,7 @@ namespace zed_wrapper {
 
         // <<<<< Static transforms
 
-        NODELET_INFO("Static TF from '%s' to '%s' is valid" , mDepthFrameId.c_str(), mBaseFrameId.c_str());
+        NODELET_INFO("Static TF from '%s' to '%s' is valid", mDepthFrameId.c_str(), mBaseFrameId.c_str());
         NODELET_INFO(" * T: [%g,%g,%g]",
                      mSensor2BaseTransf.getOrigin()[0], mSensor2BaseTransf.getOrigin()[1], mSensor2BaseTransf.getOrigin()[2]);
         NODELET_INFO(" * Q: [%g,%g,%g,%g]",
@@ -1094,7 +1094,7 @@ namespace zed_wrapper {
                       odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w);
 
         // >>>>> Odometry pose covariance if available
-#if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=6 && ZED_SDK_MINOR_VERSION<9))
+#if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=6 && ZED_SDK_MINOR_VERSION<8))
 
         if (!mSpatialMemory && mPublishPoseCovariance) {
             // >>>>> Transform from sensor to base frame
@@ -1114,7 +1114,7 @@ namespace zed_wrapper {
             memcpy(&(odom.pose.covariance[0]), covInBase.data(), 36 * sizeof(double));
         }
 
-#elif ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=9))
+#elif ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8))
 
         // >>>>> Twist in camera frame to Twist in base frame
         Eigen::Matrix<float, 6, 1> twist_cam(slPose.twist);
@@ -1220,7 +1220,7 @@ namespace zed_wrapper {
                 poseCov.pose.pose = pose;
 
                 // >>>>> Pose covariance if available
-#if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=6))
+#if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=6 && ZED_SDK_MINOR_VERSION<8))
 
                 if (!mSpatialMemory) {
                     // >>>>> Transform from sensor to base frame
@@ -1242,6 +1242,22 @@ namespace zed_wrapper {
                     ROS_WARN_THROTTLE(5.0, "Pose covariance is not available if SPATIAL MEMORY is ACTIVE");
                 }
 
+#else #if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8 )
+                // >>>>> Transform from sensor to base frame
+                geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
+                Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
+                // <<<<< Transform from sensor to base // >>>>> Transform from sensor to base
+
+                // Pose in sensor frame
+                Eigen::Matrix4f poseInSens(mLastZedPose.pose_data.m);
+
+                // Covariance in sensor frame
+                Eigen::Matrix<float, 6, 6> covInSens(mLastZedPose.pose_covariance);
+
+                // Conversion
+                Eigen::Matrix<double, 6, 6> covInBase = sl_tools::poseCovarianceAToB(R, poseInSens, covInSens).cast<double>();
+
+                memcpy(&(poseCov.pose.covariance[0]), covInBase.data(), 36 * sizeof(double));
 #else
                 ROS_WARN_THROTTLE(5.0, "Pose covariance is available starting from SDK v2.6");
 #endif
