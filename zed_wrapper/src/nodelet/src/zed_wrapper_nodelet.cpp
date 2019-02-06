@@ -1126,11 +1126,13 @@ namespace zed_wrapper {
 
 #elif ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8))
 
-            // >>>>> Twist in camera frame to Twist in base frame
-            Eigen::Matrix<float, 6, 1> twist_cam(slPose.twist);
+            // >>>>> Sensor to base transform
             geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
             Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
+            // <<<<< Sensor to base transform
 
+            // >>>>> Twist in camera frame to Twist in base frame
+            Eigen::Matrix<float, 6, 1> twist_cam(slPose.twist);
             Eigen::Matrix<float, 6, 1> twist_base = sl_tools::twistAtoB(R, twist_cam);
 
             odom.twist.twist.linear.x = twist_base(0, 0);
@@ -1140,11 +1142,6 @@ namespace zed_wrapper {
             odom.twist.twist.angular.y = twist_base(4, 0);
             odom.twist.twist.angular.z = twist_base(5, 0);
             // <<<<< Twist in camera frame to Twist in base frame
-
-            // >>>>> Sensor to base transform
-            geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
-            Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
-            // <<<<< Sensor to base transform
 
             // >>>>> Pose covariance in base frame
             // Pose in sensor frame
@@ -1191,10 +1188,14 @@ namespace zed_wrapper {
         tf2::Transform base_pose;
         base_pose.setIdentity();
 
-        if (mPublishMapTf) {
+        if (mPublishTf) {
+            if (mPublishMapTf) {
+                base_pose = mMap2BaseTransf;
+            } else {
+                base_pose = mOdom2BaseTransf;
+            }
+        } else {
             base_pose = mMap2BaseTransf;
-        } else if (mPublishTf) {
-            base_pose = mOdom2BaseTransf;
         }
 
         std_msgs::Header header;
@@ -1214,6 +1215,10 @@ namespace zed_wrapper {
         pose.orientation.y = base2frame.rotation.y;
         pose.orientation.z = base2frame.rotation.z;
         pose.orientation.w = base2frame.rotation.w;
+
+        //        ROS_DEBUG_STREAM("*** Pose: [" << base2frame.translation.x << "," <<
+        //                         base2frame.translation.y << "," <<
+        //                         base2frame.translation.z << "]" );
 
         if (mPubPose.getNumSubscribers() > 0) {
 
@@ -1241,7 +1246,7 @@ namespace zed_wrapper {
                     // >>>>> Transform from sensor to base frame
                     geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
                     Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
-                    // <<<<< Transform from sensor to base // >>>>> Transform from sensor to base
+                    // <<<<< Transform from sensor to base
 
                     // Pose in sensor frame
                     Eigen::Matrix4f poseInSens(mLastZedPose.pose_data.m);
@@ -1264,7 +1269,7 @@ namespace zed_wrapper {
                     poseCov.pose.covariance[35] = 0.01;
                 }
 
-#elif ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8 )
+#elif ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8) )
                 // >>>>> Transform from sensor to base frame
                 geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
                 Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
@@ -1281,7 +1286,12 @@ namespace zed_wrapper {
 
                 memcpy(&(poseCov.pose.covariance[0]), covInBase.data(), 36 * sizeof(double));
 #else
-                ROS_WARN_THROTTLE(5.0, "Pose covariance is available starting from SDK v2.6");
+                poseCov.pose.covariance[0] = 0.01;
+                poseCov.pose.covariance[7] = 0.01;
+                poseCov.pose.covariance[14] = 0.01;
+                poseCov.pose.covariance[21] = 0.01;
+                poseCov.pose.covariance[28] = 0.01;
+                poseCov.pose.covariance[35] = 0.01;
 #endif
                 // <<<<< Pose covariance if available
 
@@ -1976,7 +1986,7 @@ namespace zed_wrapper {
                     runParams.enable_depth = false;
                 }
 
-                mGrabStatus = mZed.grab(runParams); // Ask to not compute the depth
+                mGrabStatus = mZed.grab(runParams);
                 mGrabbing = false;
 
                 // cout << toString(grab_status) << endl;
