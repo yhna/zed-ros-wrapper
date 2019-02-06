@@ -1094,44 +1094,52 @@ namespace zed_wrapper {
                       odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w);
 
         // >>>>> Odometry pose covariance if available
+        if (mPublishPoseCovariance) {
 #if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=6 && ZED_SDK_MINOR_VERSION<8))
 
-        if (!mSpatialMemory && mPublishPoseCovariance) {
-            // >>>>> Transform from sensor to base frame
-            geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
-            Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
-            // <<<<< Transform from sensor to base // >>>>> Transform from sensor to base
+            if (!mSpatialMemory) {
+                // >>>>> Transform from sensor to base frame
+                geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
+                Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
+                // <<<<< Transform from sensor to base // >>>>> Transform from sensor to base
 
-            // Pose in sensor frame
-            Eigen::Matrix4f poseInSens(mLastZedPose.pose_data.m);
+                // Pose in sensor frame
+                Eigen::Matrix4f poseInSens(mLastZedPose.pose_data.m);
 
-            // Covariance in sensor frame
-            Eigen::Matrix<float, 6, 6> covInSens(mLastZedPose.pose_covariance);
+                // Covariance in sensor frame
+                Eigen::Matrix<float, 6, 6> covInSens(mLastZedPose.pose_covariance);
 
-            // Conversion
-            Eigen::Matrix<double, 6, 6> covInBase = sl_tools::poseCovarianceAToB(R, poseInSens, covInSens).cast<double>();
+                // Conversion
+                Eigen::Matrix<double, 6, 6> covInBase = sl_tools::poseCovarianceAToB(R, poseInSens, covInSens).cast<double>();
 
-            memcpy(&(odom.pose.covariance[0]), covInBase.data(), 36 * sizeof(double));
-        }
+                memcpy(&(odom.pose.covariance[0]), covInBase.data(), 36 * sizeof(double));
+            } else {
+                ROS_WARN_THROTTLE(5.0, "Odometry covariance is not available if SPATIAL MEMORY is ACTIVE, using fixed values");
+
+                odom.pose.covariance[0] = 0.01;
+                odom.pose.covariance[7] = 0.01;
+                odom.pose.covariance[14] = 0.01;
+                odom.pose.covariance[21] = 0.01;
+                odom.pose.covariance[28] = 0.01;
+                odom.pose.covariance[35] = 0.01;
+            }
 
 #elif ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8))
 
-        // >>>>> Twist in camera frame to Twist in base frame
-        Eigen::Matrix<float, 6, 1> twist_cam(slPose.twist);
-        geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
-        Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
+            // >>>>> Twist in camera frame to Twist in base frame
+            Eigen::Matrix<float, 6, 1> twist_cam(slPose.twist);
+            geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
+            Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
 
-        Eigen::Matrix<float, 6, 1> twist_base = sl_tools::twistAtoB(R, twist_cam);
+            Eigen::Matrix<float, 6, 1> twist_base = sl_tools::twistAtoB(R, twist_cam);
 
-        odom.twist.twist.linear.x = twist_base(0, 0);
-        odom.twist.twist.linear.y = twist_base(1, 0);
-        odom.twist.twist.linear.z = twist_base(2, 0);
-        odom.twist.twist.angular.x = twist_base(3, 0);
-        odom.twist.twist.angular.y = twist_base(4, 0);
-        odom.twist.twist.angular.z = twist_base(5, 0);
-        // <<<<< Twist in camera frame to Twist in base frame
-
-        if (!mSpatialMemory && mPublishPoseCovariance) {
+            odom.twist.twist.linear.x = twist_base(0, 0);
+            odom.twist.twist.linear.y = twist_base(1, 0);
+            odom.twist.twist.linear.z = twist_base(2, 0);
+            odom.twist.twist.angular.x = twist_base(3, 0);
+            odom.twist.twist.angular.y = twist_base(4, 0);
+            odom.twist.twist.angular.z = twist_base(5, 0);
+            // <<<<< Twist in camera frame to Twist in base frame
 
             // >>>>> Sensor to base transform
             geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
@@ -1161,10 +1169,17 @@ namespace zed_wrapper {
 
             memcpy(&(odom.twist.covariance[0]), twistCovInBase.data(), 36 * sizeof(double));
             // <<<<< Twist covariance in base frame
-        }
 
-        // <<<<< Odometry pose covariance if available
+            // <<<<< Odometry pose covariance if available
+#else
+            odom.pose.covariance[0] = 0.01;
+            odom.pose.covariance[7] = 0.01;
+            odom.pose.covariance[14] = 0.01;
+            odom.pose.covariance[21] = 0.01;
+            odom.pose.covariance[28] = 0.01;
+            odom.pose.covariance[35] = 0.01;
 #endif
+        }
 
         // Publish odometry message
         mPubOdom.publish(odom);
@@ -1239,10 +1254,17 @@ namespace zed_wrapper {
 
                     memcpy(&(poseCov.pose.covariance[0]), covInBase.data(), 36 * sizeof(double));
                 } else {
-                    ROS_WARN_THROTTLE(5.0, "Pose covariance is not available if SPATIAL MEMORY is ACTIVE");
+                    ROS_WARN_THROTTLE(5.0, "Pose covariance is not available if SPATIAL MEMORY is ACTIVE, using fixed values");
+
+                    poseCov.pose.covariance[0] = 0.01;
+                    poseCov.pose.covariance[7] = 0.01;
+                    poseCov.pose.covariance[14] = 0.01;
+                    poseCov.pose.covariance[21] = 0.01;
+                    poseCov.pose.covariance[28] = 0.01;
+                    poseCov.pose.covariance[35] = 0.01;
                 }
 
-#else #if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8 )
+#elif ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=8 )
                 // >>>>> Transform from sensor to base frame
                 geometry_msgs::Transform sens2base = tf2::toMsg(mSensor2BaseTransf);
                 Eigen::Matrix4f R = tf2::transformToEigen(sens2base).matrix().cast<float>();
