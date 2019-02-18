@@ -1151,7 +1151,7 @@ namespace zed_wrapper {
             Eigen::Matrix4f poseInSens(slPose.pose_data.m);
 
             // Covariance in sensor frame
-            Eigen::Matrix<float, 6, 6> covInSens(slPose.pose_covariance);
+            Eigen::Matrix<float, 6, 6> covInSens(slPose.pose_covariance); // TODO accumulate covariance!
 
             // Conversion
             Eigen::Matrix<double, 6, 6> covInBase = sl_tools::poseCovarianceAToB(R, poseInSens, covInSens).cast<double>();
