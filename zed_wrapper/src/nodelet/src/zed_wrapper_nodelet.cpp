@@ -1002,6 +1002,8 @@ namespace zed_wrapper {
         mNhNs.getParam("two_d_mode", mTwoDMode);
         mNhNs.getParam("fixed_z_value", mFixedZValue);
 
+
+
 #ifdef TERRAIN_MAPPING
 
         if (mTerrainMap && !mFloorAlignment) {
@@ -1037,6 +1039,11 @@ namespace zed_wrapper {
         trackParams.enable_spatial_memory = mSpatialMemory;
         NODELET_INFO_STREAM("Spatial Memory : " << (trackParams.enable_spatial_memory ? "ENABLED" : "DISABLED"));
         trackParams.initial_world_transform = mInitialPoseSl;
+        NODELET_INFO_STREAM("Two D mode : " << (mTwoDMode ? "ENABLED" : "DISABLED"));
+        if(mTwoDMode) {
+            NODELET_INFO_STREAM("Fixed Z value : " << mFixedZValue);
+        }
+
 
 #if ((ZED_SDK_MAJOR_VERSION>2) || (ZED_SDK_MAJOR_VERSION==2 && ZED_SDK_MINOR_VERSION>=6))
         trackParams.set_floor_as_origin = mFloorAlignment;

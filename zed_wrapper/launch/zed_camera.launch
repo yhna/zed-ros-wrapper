@@ -121,7 +121,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <param name="spatial_memory"                value="true" /> <!-- "true" or "false" -->
         <param name="floor_alignment"               value="false" /> <!-- "true" or "false" -->
         <param name="two_d_mode"                    value="true" />
-        <param name="fixed_z_value"                 value="0.05" />
+        <param name="fixed_z_value"                 value="0.015" />
 
         <param name="terrain_mapping"               value="false" /> <!-- "true" or "false" -->
         <param name="loc_terrain_pub_rate"          value="5.0" />
