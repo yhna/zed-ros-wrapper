@@ -999,6 +999,9 @@ namespace zed_wrapper {
         mNhNs.getParam("pose_smoothing", mPoseSmoothing);
         mNhNs.getParam("spatial_memory", mSpatialMemory);
         mNhNs.getParam("floor_alignment", mFloorAlignment);
+        mNhNs.getParam("two_d_mode", mTwoDMode);
+        mNhNs.getParam("fixed_z_value", mFixedZValue);
+
 #ifdef TERRAIN_MAPPING
 
         if (mTerrainMap && !mFloorAlignment) {
@@ -1148,7 +1151,7 @@ namespace zed_wrapper {
             Eigen::Matrix4f poseInSens(slPose.pose_data.m);
 
             // Covariance in sensor frame
-            Eigen::Matrix<float, 6, 6> covInSens(slPose.pose_covariance);
+            Eigen::Matrix<float, 6, 6> covInSens(slPose.pose_covariance); // TODO accumulate covariance!
 
             // Conversion
             Eigen::Matrix<double, 6, 6> covInBase = sl_tools::poseCovarianceAToB(R, poseInSens, covInSens).cast<double>();
@@ -2205,13 +2208,35 @@ namespace zed_wrapper {
                         sl::Pose deltaOdom;
                         mTrackingStatus = mZed.getPosition(deltaOdom, sl::REFERENCE_FRAME_CAMERA);
 
-                        sl::Translation translation = deltaOdom.getTranslation();
-                        sl::Orientation quat = deltaOdom.getOrientation();
+                        sl::Orientation sl_quat = deltaOdom.getOrientation();
+                        sl::Translation sl_trasl = deltaOdom.getTranslation();
+
+                        if (mTwoDMode) {
+                            sl_trasl.z = mFixedZValue;
+
+                            double roll, pitch, yaw;
+
+                            tf2::Quaternion quat;
+                            quat.setX(sl_quat.ox);
+                            quat.setY(sl_quat.oy);
+                            quat.setZ(sl_quat.oz);
+                            quat.setW(sl_quat.ow);
+
+                            tf2::Matrix3x3 mat(quat);
+                            mat.getRPY(roll, pitch, yaw);
+
+                            quat.setRPY(0.0, 0.0, yaw);
+
+                            sl_quat.ox = quat.getX();
+                            sl_quat.oy = quat.getY();
+                            sl_quat.oz = quat.getZ();
+                            sl_quat.ow = quat.getW();
+                        }
 
                         NODELET_DEBUG("CAMERA delta ODOM [%s] - [%.2f,%.2f,%.2f] [%.2f,%.2f,%.2f,%.2f]",
                                       sl::toString(mTrackingStatus).c_str(),
-                                      translation(mIdxX), translation(mIdxY), translation(mIdxZ),
-                                      quat(mIdxX), quat(mIdxY), quat(mIdxZ), quat(3));
+                                      sl_trasl(mIdxX), sl_trasl(mIdxY), sl_trasl(mIdxZ),
+                                      sl_quat(mIdxX), sl_quat(mIdxY), sl_quat(mIdxZ), sl_quat(3));
 
                         if (mTrackingStatus == sl::TRACKING_STATE_OK || mTrackingStatus == sl::TRACKING_STATE_SEARCHING ||
                             mTrackingStatus == sl::TRACKING_STATE_FPS_TOO_LOW) {
@@ -2230,13 +2255,13 @@ namespace zed_wrapper {
 
                             // Transform ZED delta odom pose in TF2 Transformation
                             geometry_msgs::Transform deltaTransf;
-                            deltaTransf.translation.x = mSignX * translation(mIdxX);
-                            deltaTransf.translation.y = mSignY * translation(mIdxY);
-                            deltaTransf.translation.z = mSignZ * translation(mIdxZ);
-                            deltaTransf.rotation.x = mSignX * quat(mIdxX);
-                            deltaTransf.rotation.y = mSignY * quat(mIdxY);
-                            deltaTransf.rotation.z = mSignZ * quat(mIdxZ);
-                            deltaTransf.rotation.w = quat(3);
+                            deltaTransf.translation.x = mSignX * sl_trasl(mIdxX);
+                            deltaTransf.translation.y = mSignY * sl_trasl(mIdxY);
+                            deltaTransf.translation.z = mSignZ * sl_trasl(mIdxZ);
+                            deltaTransf.rotation.x = mSignX * sl_quat(mIdxX);
+                            deltaTransf.rotation.y = mSignY * sl_quat(mIdxY);
+                            deltaTransf.rotation.z = mSignZ * sl_quat(mIdxZ);
+                            deltaTransf.rotation.w = sl_quat(3);
                             tf2::Transform deltaOdomTf;
                             tf2::fromMsg(deltaTransf, deltaOdomTf);
                             // delta odom from sensor to base frame
@@ -2275,27 +2300,49 @@ namespace zed_wrapper {
                     static sl::TRACKING_STATE oldStatus;
                     mTrackingStatus = mZed.getPosition(mLastZedPose, sl::REFERENCE_FRAME_WORLD);
 
-                    sl::Translation translation = mLastZedPose.getTranslation();
-                    sl::Orientation quat = mLastZedPose.getOrientation();
+                    sl::Translation sl_trasl = mLastZedPose.getTranslation();
+                    sl::Orientation sl_quat = mLastZedPose.getOrientation();
+
+                    if (mTwoDMode) {
+                        sl_trasl.z = mFixedZValue;
+
+                        double roll, pitch, yaw;
+
+                        tf2::Quaternion quat;
+                        quat.setX(sl_quat.ox);
+                        quat.setY(sl_quat.oy);
+                        quat.setZ(sl_quat.oz);
+                        quat.setW(sl_quat.ow);
+
+                        tf2::Matrix3x3 mat(quat);
+                        mat.getRPY(roll, pitch, yaw);
+
+                        quat.setRPY(0.0, 0.0, yaw);
+
+                        sl_quat.ox = quat.getX();
+                        sl_quat.oy = quat.getY();
+                        sl_quat.oz = quat.getZ();
+                        sl_quat.ow = quat.getW();
+                    }
 
 
                     NODELET_DEBUG("CAMERA POSE [%s] - [%.2f,%.2f,%.2f] [%.2f,%.2f,%.2f,%.2f]",
                                   sl::toString(mTrackingStatus).c_str(),
-                                  translation(mIdxX), translation(mIdxY), translation(mIdxZ),
-                                  quat(mIdxX), quat(mIdxY), quat(mIdxZ), quat(3));
+                                  sl_trasl(mIdxX), sl_trasl(mIdxY), sl_trasl(mIdxZ),
+                                  sl_quat(mIdxX), sl_quat(mIdxY), sl_quat(mIdxZ), sl_quat(3));
 
                     if (mTrackingStatus == sl::TRACKING_STATE_OK ||
                         mTrackingStatus == sl::TRACKING_STATE_SEARCHING /*|| status == sl::TRACKING_STATE_FPS_TOO_LOW*/) {
                         // Transform ZED pose in TF2 Transformation
                         geometry_msgs::Transform map2sensTransf;
 
-                        map2sensTransf.translation.x = mSignX * translation(mIdxX);
-                        map2sensTransf.translation.y = mSignY * translation(mIdxY);
-                        map2sensTransf.translation.z = mSignZ * translation(mIdxZ);
-                        map2sensTransf.rotation.x = mSignX * quat(mIdxX);
-                        map2sensTransf.rotation.y = mSignY * quat(mIdxY);
-                        map2sensTransf.rotation.z = mSignZ * quat(mIdxZ);
-                        map2sensTransf.rotation.w = quat(3);
+                        map2sensTransf.translation.x = mSignX * sl_trasl(mIdxX);
+                        map2sensTransf.translation.y = mSignY * sl_trasl(mIdxY);
+                        map2sensTransf.translation.z = mSignZ * sl_trasl(mIdxZ);
+                        map2sensTransf.rotation.x = mSignX * sl_quat(mIdxX);
+                        map2sensTransf.rotation.y = mSignY * sl_quat(mIdxY);
+                        map2sensTransf.rotation.z = mSignZ * sl_quat(mIdxZ);
+                        map2sensTransf.rotation.w = sl_quat(3);
                         tf2::Transform map_to_sens_transf;
                         tf2::fromMsg(map2sensTransf, map_to_sens_transf);
 
