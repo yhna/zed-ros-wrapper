@@ -2250,13 +2250,17 @@ namespace zed_wrapper {
                             mOdom2BaseTransf = mOdom2BaseTransf * deltaOdomTf_base;
 
                             if (mTwoDMode) {
-                                mOdom2BaseTransf.translation.z = mFixedZValue;
+                                tf2::Vector3 tr_2d = mOdom2BaseTransf.getOrigin();
+                                tr_2d.setZ(mFixedZValue);
+                                mOdom2BaseTransf.setOrigin(tr_2d);
 
                                 double roll, pitch, yaw;
                                 tf2::Matrix3x3(mOdom2BaseTransf.getRotation()).getRPY(roll, pitch, yaw);
 
-                                mOdom2BaseTransf.translation.setRPY(0.0,0.0,yaw);
+                                tf2::Quaternion quat_2d;
+                                quat_2d.setRPY(0.0, 0.0, yaw);
 
+                                mOdom2BaseTransf.setRotation(quat_2d);
                             }
 
 #ifndef NDEBUG // Enable to check if TF tree is correct
@@ -2326,12 +2330,17 @@ namespace zed_wrapper {
                         mMap2BaseTransf = map_to_sens_transf * mSensor2BaseTransf; // Base position in map frame
 
                         if (mTwoDMode) {
-                            mMap2BaseTransf.translation.z = mFixedZValue;
+                            tf2::Vector3 tr_2d = mMap2BaseTransf.getOrigin();
+                            tr_2d.setZ(mFixedZValue);
+                            mMap2BaseTransf.setOrigin(tr_2d);
 
                             double roll, pitch, yaw;
                             tf2::Matrix3x3(mMap2BaseTransf.getRotation()).getRPY(roll, pitch, yaw);
 
-                            mMap2BaseTransf.translation.setRPY(0.0,0.0,yaw);
+                            tf2::Quaternion quat_2d;
+                            quat_2d.setRPY(0.0, 0.0, yaw);
+
+                            mMap2BaseTransf.setRotation(quat_2d);
                         }
 
 #ifndef NDEBUG // Enable to check if TF tree is correct
