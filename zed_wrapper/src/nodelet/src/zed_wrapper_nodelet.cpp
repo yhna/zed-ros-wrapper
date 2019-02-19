@@ -2211,28 +2211,6 @@ namespace zed_wrapper {
                         sl::Orientation sl_quat = deltaOdom.getOrientation();
                         sl::Translation sl_trasl = deltaOdom.getTranslation();
 
-                        if (mTwoDMode) {
-                            sl_trasl.z = mFixedZValue;
-
-                            double roll, pitch, yaw;
-
-                            tf2::Quaternion quat;
-                            quat.setX(sl_quat.ox);
-                            quat.setY(sl_quat.oy);
-                            quat.setZ(sl_quat.oz);
-                            quat.setW(sl_quat.ow);
-
-                            tf2::Matrix3x3 mat(quat);
-                            mat.getRPY(roll, pitch, yaw);
-
-                            quat.setRPY(0.0, 0.0, yaw);
-
-                            sl_quat.ox = quat.getX();
-                            sl_quat.oy = quat.getY();
-                            sl_quat.oz = quat.getZ();
-                            sl_quat.ow = quat.getW();
-                        }
-
                         NODELET_DEBUG("CAMERA delta ODOM [%s] - [%.2f,%.2f,%.2f] [%.2f,%.2f,%.2f,%.2f]",
                                       sl::toString(mTrackingStatus).c_str(),
                                       sl_trasl(mIdxX), sl_trasl(mIdxY), sl_trasl(mIdxZ),
@@ -2271,6 +2249,16 @@ namespace zed_wrapper {
                             // Propagate Odom transform in time
                             mOdom2BaseTransf = mOdom2BaseTransf * deltaOdomTf_base;
 
+                            if (mTwoDMode) {
+                                mOdom2BaseTransf.translation.z = mFixedZValue;
+
+                                double roll, pitch, yaw;
+                                tf2::Matrix3x3(mOdom2BaseTransf.getRotation()).getRPY(roll, pitch, yaw);
+
+                                mOdom2BaseTransf.translation.setRPY(0.0,0.0,yaw);
+
+                            }
+
 #ifndef NDEBUG // Enable to check if TF tree is correct
                             double roll, pitch, yaw;
                             tf2::Matrix3x3(mOdom2BaseTransf.getRotation()).getRPY(roll, pitch, yaw);
@@ -2302,29 +2290,6 @@ namespace zed_wrapper {
 
                     sl::Translation sl_trasl = mLastZedPose.getTranslation();
                     sl::Orientation sl_quat = mLastZedPose.getOrientation();
-
-                    if (mTwoDMode) {
-                        sl_trasl.z = mFixedZValue;
-
-                        double roll, pitch, yaw;
-
-                        tf2::Quaternion quat;
-                        quat.setX(sl_quat.ox);
-                        quat.setY(sl_quat.oy);
-                        quat.setZ(sl_quat.oz);
-                        quat.setW(sl_quat.ow);
-
-                        tf2::Matrix3x3 mat(quat);
-                        mat.getRPY(roll, pitch, yaw);
-
-                        quat.setRPY(0.0, 0.0, yaw);
-
-                        sl_quat.ox = quat.getX();
-                        sl_quat.oy = quat.getY();
-                        sl_quat.oz = quat.getZ();
-                        sl_quat.ow = quat.getW();
-                    }
-
 
                     NODELET_DEBUG("CAMERA POSE [%s] - [%.2f,%.2f,%.2f] [%.2f,%.2f,%.2f,%.2f]",
                                   sl::toString(mTrackingStatus).c_str(),
@@ -2359,6 +2324,15 @@ namespace zed_wrapper {
                         }
 
                         mMap2BaseTransf = map_to_sens_transf * mSensor2BaseTransf; // Base position in map frame
+
+                        if (mTwoDMode) {
+                            mMap2BaseTransf.translation.z = mFixedZValue;
+
+                            double roll, pitch, yaw;
+                            tf2::Matrix3x3(mMap2BaseTransf.getRotation()).getRPY(roll, pitch, yaw);
+
+                            mMap2BaseTransf.translation.setRPY(0.0,0.0,yaw);
+                        }
 
 #ifndef NDEBUG // Enable to check if TF tree is correct
                         double roll, pitch, yaw;
